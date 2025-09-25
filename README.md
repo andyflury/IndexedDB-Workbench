@@ -15,8 +15,11 @@ IndexedDB Workbench is a single-page web application that provides a graphical i
 
 ## Getting Started
 
+Preview IndexDB Workbench [here ](https://htmlpreview.github.io/?https://github.com/andyflury/IndexedDB-Workbench/blob/main/index.html)
+
+or: 
 1. Clone or download this repository.
-2. Open `index.html` in a modern browser **or** start a tiny static server and navigate to it
+2. Open `index.html`  
 3. Grant the page access to IndexedDB (browsers typically allow this automatically for same-origin pages).
 4. Use the sidebar to choose a database, then explore stores, run SQL queries, and modify records as needed.
 
