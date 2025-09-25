@@ -991,7 +991,7 @@ Expecting `+g4.join(", ")+", got '"+(this.terminals_[H2]||H2)+"'":F3="Parse erro
                     });
                     state.records = state.rawRecords.map(entry => normalizeRecord(entry.value, entry.key));
                     state.queryBaseRecords = [...state.records];
-                    sqlInputEl.value = 'SELECT * FROM records';
+                    sqlInputEl.value = getDefaultSelectQuery();
                     searchInputEl.value = '';
                     limitInputEl.value = '';
                     applyFilters();
@@ -1219,6 +1219,37 @@ Expecting `+g4.join(", ")+", got '"+(this.terminals_[H2]||H2)+"'":F3="Parse erro
             renderTable();
         }
 
+        function getDefaultSelectQuery() {
+            if (!state.selectedStore) {
+                return 'SELECT * FROM records';
+            }
+            return `SELECT * FROM ${formatIdentifierForQuery(state.selectedStore)}`;
+        }
+
+        function formatIdentifierForQuery(name) {
+            if (typeof name !== 'string' || name.length === 0) {
+                return 'records';
+            }
+            if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+                return name;
+            }
+            return `[${name.replace(/]/g, ']]')}]`;
+        }
+
+        function registerQueryTable(name, rows) {
+            if (!name) return () => {};
+            const identifier = formatIdentifierForQuery(name);
+            alasql(`CREATE TABLE IF NOT EXISTS ${identifier}`);
+            const table = alasql.tables[name];
+            if (!table) {
+                throw new Error(`Unable to prepare query table "${name}".`);
+            }
+            table.data = rows.map(record => ({ ...record }));
+            return () => {
+                table.data = [];
+            };
+        }
+
         function runSqlQuery() {
             if (!state.records.length) {
                 showToast('No records loaded.', 'error');
@@ -1250,23 +1281,21 @@ Expecting `+g4.join(", ")+", got '"+(this.terminals_[H2]||H2)+"'":F3="Parse erro
         }
 
         function executeRecordsQuery(query) {
-            if (!alasql.tables.records) {
-                alasql('CREATE TABLE IF NOT EXISTS records');
+            const rows = state.records.map(record => ({ ...record }));
+            const cleanups = [];
+            cleanups.push(registerQueryTable('records', rows));
+            if (state.selectedStore) {
+                cleanups.push(registerQueryTable(state.selectedStore, rows));
             }
-            const table = alasql.tables.records;
-            if (!table) {
-                throw new Error('Unable to initialize query table.');
-            }
-            table.data = state.records.map(record => ({ ...record }));
             try {
                 return alasql(query);
             } finally {
-                table.data = [];
+                cleanups.forEach(cleanup => cleanup());
             }
         }
 
         function resetQuery() {
-            sqlInputEl.value = 'SELECT * FROM records';
+            sqlInputEl.value = getDefaultSelectQuery();
             searchInputEl.value = '';
             limitInputEl.value = '';
             state.queryBaseRecords = [...state.records];
