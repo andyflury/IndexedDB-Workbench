@@ -445,7 +445,7 @@
             <div class="section" id="querySection">
                 <h2>Data Explorer</h2>
                 <div class="info-callout">
-                    Run SQL-like queries on the loaded records. Use <code>SELECT * FROM records</code> by default. Fields are accessible by their property names, plus a <code>key</code> column for the record key.
+                    Run SQL-like queries on the loaded records. Use <code>SELECT * FROM records</code> by default. Fields are accessible by their property names, plus a <code>key</code> column for the record key. Queries are read-only—use the form below for inserts, updates, or deletes.
                 </div>
                 <label for="sqlInput" style="margin-top:1rem;">SQL Query</label>
                 <textarea id="sqlInput" class="sql-input" placeholder="SELECT * FROM records"></textarea>
@@ -958,15 +958,19 @@
                 showToast('No records loaded.', 'error');
                 return;
             }
-            const query = sqlInputEl.value.trim() || 'SELECT * FROM records';
+            const query = (sqlInputEl.value.trim() || 'SELECT * FROM records');
+            if (!/^(select|with)\b/i.test(query)) {
+                showToast('Only SELECT queries are supported here. Use the CRUD form for modifications.', 'error');
+                return;
+            }
             try {
-                const result = alasql(query, [state.records]);
-                if (!Array.isArray(result)) {
+                const rows = executeRecordsQuery(query);
+                if (!Array.isArray(rows)) {
                     showToast('Query executed. See console for result.', 'info');
-                    console.log(result);
+                    console.log(rows);
                     return;
                 }
-                state.queryBaseRecords = result.map(record => (
+                state.queryBaseRecords = rows.map(record => (
                     record && typeof record === 'object'
                         ? { ...record }
                         : { value: record }
@@ -976,6 +980,22 @@
             } catch (error) {
                 console.error(error);
                 showToast(`Query error: ${error.message}`, 'error');
+            }
+        }
+
+        function executeRecordsQuery(query) {
+            if (!alasql.tables.records) {
+                alasql('CREATE TABLE IF NOT EXISTS records');
+            }
+            const table = alasql.tables.records;
+            if (!table) {
+                throw new Error('Unable to initialize query table.');
+            }
+            table.data = state.records.map(record => ({ ...record }));
+            try {
+                return alasql(query);
+            } finally {
+                table.data = [];
             }
         }
 
